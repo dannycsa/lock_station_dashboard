@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MOBI Lock Station — Operations Dashboard</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- MQTT.js via CDN -->
+  <script src="https://unpkg.com/mqtt@5.3.4/dist/mqtt.min.js"></script>
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+  <!-- ═══════════════════════ HEADER ═══════════════════════ -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="logo-mark">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+          <rect x="2" y="2" width="10" height="10" rx="2" fill="var(--accent)"/>
+          <rect x="16" y="2" width="10" height="10" rx="2" fill="var(--accent)" opacity="0.5"/>
+          <rect x="2" y="16" width="10" height="10" rx="2" fill="var(--accent)" opacity="0.5"/>
+          <rect x="16" y="16" width="10" height="10" rx="2" fill="var(--accent)" opacity="0.2"/>
+        </svg>
+      </div>
+      <div class="header-title">
+        <span class="brand">MOBI</span>
+        <span class="subtitle">Lock Station Ops</span>
+      </div>
+    </div>
+    <div class="header-center">
+      <div class="mqtt-status" id="mqttStatusBadge">
+        <span class="status-dot" id="mqttDot"></span>
+        <span id="mqttStatusText">Disconnected</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="stats-pill">
+        <span class="stat-item"><span class="stat-num" id="statTotal">11</span><span class="stat-label">Stations</span></span>
+        <div class="stat-divider"></div>
+        <span class="stat-item"><span class="stat-num" id="statActive">1</span><span class="stat-label">Active</span></span>
+        <div class="stat-divider"></div>
+        <span class="stat-item"><span class="stat-num" id="statPlanned">10</span><span class="stat-label">Planned</span></span>
+      </div>
+      <button class="settings-btn" id="settingsBtn" title="Connection Settings">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════ MAIN LAYOUT ═══════════════════════ -->
+  <main class="app-main">
+
+    <!-- MAP PANEL -->
+    <div class="map-panel" id="mapPanel">
+      <div class="panel-label">Fleet Map — Asunción, Paraguay</div>
+      <div id="map"></div>
+      <div class="map-legend">
+        <span class="legend-item"><span class="legend-dot active"></span>Active MVP</span>
+        <span class="legend-item"><span class="legend-dot planned"></span>Planned</span>
+        <span class="legend-item"><span class="legend-dot double"></span>Double-sided</span>
+        <span class="legend-item"><span class="legend-dot single"></span>Single-sided</span>
+      </div>
+    </div>
+
+    <!-- STATION PANEL (initially hidden) -->
+    <div class="station-panel" id="stationPanel">
+      <div class="station-panel-header">
+        <div class="station-info">
+          <button class="back-btn" id="backToMapBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+            Map
+          </button>
+          <div class="station-title-block">
+            <h2 id="stationName">—</h2>
+            <span class="station-type-badge" id="stationTypeBadge">—</span>
+          </div>
+        </div>
+        <div class="station-actions">
+          <div class="topic-display" id="topicDisplay">—</div>
+          <button class="btn btn-check-all" id="checkAllBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Check All Locks
+          </button>
+        </div>
+      </div>
+
+      <!-- LOCK LAYOUT VISUAL -->
+      <div class="lock-layout-container" id="lockLayoutContainer">
+        <!-- Dynamically rendered -->
+      </div>
+
+      <!-- LOG CONSOLE -->
+      <div class="log-panel">
+        <div class="log-header">
+          <span class="log-title">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            MQTT Log
+          </span>
+          <button class="log-clear-btn" id="clearLogBtn">Clear</button>
+        </div>
+        <div class="log-entries" id="logEntries">
+          <div class="log-entry log-info">Dashboard initialized. Select a station on the map to begin.</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ═══════════════════════ SETTINGS MODAL ═══════════════════════ -->
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>Connection Settings</h3>
+        <button class="modal-close" id="closeSettingsBtn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Flespi MQTT Broker</label>
+          <input type="text" id="cfgBroker" value="wss://mqtt.flespi.io" readonly/>
+        </div>
+        <div class="form-group">
+          <label>Flespi Token <span class="field-hint">(used as MQTT username)</span></label>
+          <input type="text" id="cfgToken" placeholder="Paste your Flespi token here"/>
+        </div>
+        <div class="form-group">
+          <label>Client ID</label>
+          <input type="text" id="cfgClientId" placeholder="e.g. Dashboard_Ops_01"/>
+        </div>
+        <div class="form-note">
+          ⚠️ Token extracted from ESP32 firmware is pre-filled. Use a dedicated read-only token for the dashboard in production.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="disconnectBtn">Disconnect</button>
+        <button class="btn btn-primary" id="connectBtn">Connect</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════ CONFIRM MODAL ═══════════════════════ -->
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal-box modal-small">
+      <div class="modal-header">
+        <h3 id="confirmTitle">Confirm Action</h3>
+      </div>
+      <div class="modal-body">
+        <p id="confirmMessage" class="confirm-message"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="confirmCancelBtn">Cancel</button>
+        <button class="btn btn-unlock" id="confirmOkBtn">Send Unlock</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="stations.js"></script>
+  <script src="mqtt-client.js"></script>
+  <script src="map.js"></script>
+  <script src="station-view.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
